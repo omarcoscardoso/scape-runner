@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Scape Runner | Sobrevivência Voxel FPS Multiplayer</title>
+    <!-- Google Fonts for Retro-Futuristic styling -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Retro Arcade CRT Scanline & Vignette Overlays -->
+    <div class="crt-overlay"></div>
+    <div class="vignette"></div>
+
+    <!-- WebGL Renderer Container -->
+    <div id="game-container"></div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="overlay-screen active">
+        <div class="screen-content">
+            <h1 class="logo glow-text">SCAPE RUNNER</h1>
+            <h3 class="subtitle">CORRA OU MORRA. CADA UM POR SI.</h3>
+            <div class="spinner">
+                <div class="pixel-box"></div>
+            </div>
+            <p class="loading-status">A Carregar Setores do Labirinto...</p>
+        </div>
+    </div>
+
+    <!-- Start Menu Screen -->
+    <div id="menu-screen" class="overlay-screen">
+        <div class="screen-content glass-panel">
+            <h1 class="logo glow-text pulse-animation">SCAPE RUNNER</h1>
+            <p class="game-story-text">Um grupo de sobreviventes foi trancado num complexo de labirintos mortais. A única saída é o Portal Dourado, mas os Drones Sentinela patrulham cada esquina com lasers letais. Não há equipas. Não há tréguas. É cada um por si. Corra para sobreviver.</p>
+            
+            <div class="menu-form">
+                <div class="input-group">
+                    <label for="player-name-input">IDENTIFICAÇÃO DO CORREDOR</label>
+                    <input type="text" id="player-name-input" maxlength="12" placeholder="SOBREVIVENTE">
+                </div>
+                
+                <div class="color-picker-container">
+                    <label>COR DO TRAJE SENSORIAL</label>
+                    <div class="color-options">
+                        <div class="color-opt active" style="background: #00aaff;" data-color="0x00aaff"></div>
+                        <div class="color-opt" style="background: #ffaa00;" data-color="0xffaa00"></div>
+                        <div class="color-opt" style="background: #00ffaa;" data-color="0x00ffaa"></div>
+                        <div class="color-opt" style="background: #ff00aa;" data-color="0xff00aa"></div>
+                        <div class="color-opt" style="background: #aaff00;" data-color="0xaaff00"></div>
+                        <div class="color-opt" style="background: #aa00ff;" data-color="0xaa00ff"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-guide">
+                <h4>GUIA TÁTICO DE CONTROLOS</h4>
+                <ul>
+                    <li><span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span class="key">D</span> / <span class="key">Setas</span> : Movimento</li>
+                    <li><span class="key">Rato</span> : Olhar em Volta / Mirar</li>
+                    <li><span class="key">Clique Esquerdo</span> : Esticar e Soltar Atiradeira (Disparo)</li>
+                    <li><span class="key">Enter</span> : Conversar no Chat</li>
+                    <li><span class="key">ESC</span> : Pausar / Libertar Rato</li>
+                </ul>
+            </div>
+
+            <button id="btn-play" class="btn glow-btn">INICIAR CORRIDA PELA VIDA</button>
+        </div>
+    </div>
+
+    <!-- Pause/Connection Screen -->
+    <div id="pause-screen" class="overlay-screen">
+        <div class="screen-content glass-panel">
+            <h2 class="glow-text">ESCAPE SUSPENSO</h2>
+            <p>Clique no ecrã para retomar o bloqueio da câmara e continuar a correr.</p>
+            <button id="btn-resume" class="btn glow-btn">RETOMAR CORRIDA</button>
+        </div>
+    </div>
+
+    <!-- Win / Round Over Screen -->
+    <div id="win-screen" class="overlay-screen">
+        <div class="screen-content glass-panel">
+            <h1 class="glow-text victory-text blinking">LABIRINTO VENCIDO!</h1>
+            <p class="winner-announcement"><span id="winner-name" class="highlight">Jogador</span> escapou pelo Portal Dourado!</p>
+            
+            <div class="round-stats">
+                <div class="stat-box">
+                    <span class="label">PONTOS</span>
+                    <span id="win-score" class="value glow-text-cyan">0</span>
+                </div>
+                <div class="stat-box">
+                    <span class="label">TEMPO DE CORRIDA</span>
+                    <span id="win-time" class="value glow-text-green">0s</span>
+                </div>
+            </div>
+
+            <div class="restart-timer">
+                Próximo labirinto será gerado em <span id="restart-countdown" class="highlight-yellow">10</span> segundos...
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over / Death Screen -->
+    <div id="game-over-screen" class="overlay-screen">
+        <div class="screen-content glass-panel border-red">
+            <h1 class="glow-text-red death-text blinking">ELIMINADO!</h1>
+            <p class="game-over-description">O labirinto do Scape Runner foi implacável.</p>
+            
+            <div class="round-stats">
+                <div class="stat-box border-red-dashed">
+                    <span class="label">PONTOS ACUMULADOS</span>
+                    <span id="death-score" class="value glow-text-red">0</span>
+                </div>
+                <div class="stat-box border-red-dashed">
+                    <span class="label">TEMPO DE CORRIDA</span>
+                    <span id="death-time" class="value glow-text-yellow">0s</span>
+                </div>
+            </div>
+
+            <div class="death-options">
+                <button id="btn-respawn" class="btn glow-btn-red">REANIMAR E SEGUIR (PENALIDADE DE TEMPO)</button>
+                <button id="btn-to-menu" class="btn btn-secondary">VOLTAR AO MENU PRINCIPAL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic HUD System (Active in Game) -->
+    <div id="game-hud">
+        
+        <!-- TOP-LEFT PANEL: Stats -->
+        <div class="hud-panel top-left-hud glass-panel">
+            <div class="stat-row">
+                <span class="hud-label">VIDA:</span>
+                <span id="hud-health-val" class="hud-value health-text">100%</span>
+            </div>
+            <div class="stat-row">
+                <span class="hud-label">ARMADURA:</span>
+                <span id="hud-armor-val" class="hud-value armor-text">100%</span>
+            </div>
+            <div class="stat-row">
+                <span class="hud-label">TIMER:</span>
+                <span id="hud-timer-val" class="hud-value speedrun-text">0.00s</span>
+            </div>
+            <div class="stat-row">
+                <span class="hud-label">RECORDE:</span>
+                <span id="hud-best-val" class="hud-value best-text">--:--</span>
+            </div>
+            <div class="stat-row">
+                <span class="hud-label">PONTOS:</span>
+                <span id="hud-score-val" class="hud-value score-text">10000</span>
+            </div>
+        </div>
+
+        <!-- TOP-RIGHT PANEL: Minimap -->
+        <div class="hud-panel top-right-hud glass-panel">
+            <div class="minimap-title">MAPA TÁTICO</div>
+            <canvas id="minimap-canvas" width="128" height="128"></canvas>
+            <div class="minimap-legend">
+                <span class="leg-item"><span class="leg-color blue"></span> Você</span>
+                <span class="leg-item"><span class="leg-color gold"></span> Portal</span>
+                <span class="leg-item"><span class="leg-color red"></span> Drone</span>
+            </div>
+        </div>
+
+        <!-- BOTTOM-CENTER PANEL: Commander Portrait and Bars -->
+        <div class="hud-panel bottom-center-hud">
+            <div class="bars-container">
+                <div class="progress-bar-wrapper">
+                    <span class="bar-tag">HP</span>
+                    <div class="progress-bar-bg">
+                        <div id="hud-health-bar" class="progress-bar-fill health-bar" style="width: 100%;"></div>
+                    </div>
+                </div>
+                <div class="progress-bar-wrapper">
+                    <span class="bar-tag">AR</span>
+                    <div class="progress-bar-bg">
+                        <div id="hud-armor-bar" class="progress-bar-fill armor-bar" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Face Canvas container -->
+            <div class="portrait-container glass-panel">
+                <canvas id="portrait-canvas" width="80" height="80"></canvas>
+            </div>
+        </div>
+
+        <!-- BOTTOM-RIGHT PANEL: Slingshot Ammo -->
+        <div class="hud-panel bottom-right-hud glass-panel">
+            <div class="ammo-title">MUNIÇÃO</div>
+            <div class="ammo-count">
+                <span id="hud-ammo-val" class="glow-text">10</span>
+                <span class="slash">/</span>
+                <span id="hud-ammo-max">10</span>
+            </div>
+            <div class="ammo-type">PEDRAS DE ATIRADEIRA</div>
+        </div>
+
+        <!-- In-game Multiplayer Scoreboard / Player list -->
+        <div id="scoreboard-hud" class="glass-panel">
+            <div class="score-title">ONLINE RUNNERS</div>
+            <ul id="player-list">
+                <!-- Dynamically populated -->
+            </ul>
+        </div>
+
+        <!-- Interactive Text Chat System (Repositioned to Bottom-Left) -->
+        <div id="chat-hud">
+            <div id="chat-messages"></div>
+            <input type="text" id="chat-input" maxlength="80" placeholder="Prime Enter para conversar...">
+        </div>
+
+        <!-- Crosshair HUD -->
+        <div id="crosshair">
+            <div class="ch-dot"></div>
+            <div class="ch-line left"></div>
+            <div class="ch-line right"></div>
+            <div class="ch-line top"></div>
+            <div class="ch-line bottom"></div>
+        </div>
+
+        <!-- Slingshot Canvas Layer for HUD animations (elastic stretch and snaps) -->
+        <canvas id="slingshot-canvas"></canvas>
+    </div>
+
+    <!-- Three.js Library & Custom Scripts Imports -->
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.152.0/build/three.module.js';
+        // Expose THREE globally so other scripts can access it easily
+        window.THREE = THREE;
+    </script>
+    <script type="module" src="sound.js"></script>
+    <script type="module" src="textures.js"></script>
+    <script type="module" src="maze.js"></script>
+    <script type="module" src="game.js"></script>
+</body>
+</html>
