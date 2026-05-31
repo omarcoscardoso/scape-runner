@@ -30,41 +30,66 @@
 
     <!-- Start Menu Screen -->
     <div id="menu-screen" class="overlay-screen">
-        <div class="screen-content glass-panel">
-            <h1 class="logo glow-text pulse-animation">SCAPE RUNNER</h1>
-            <p class="game-story-text">Um grupo de sobreviventes foi trancado num complexo de labirintos mortais. A única saída é o Portal Dourado, mas os Drones Sentinela patrulham cada esquina com lasers letais. Não há equipas. Não há tréguas. É cada um por si. Corra para sobreviver.</p>
-            
-            <div class="menu-form">
-                <div class="input-group">
-                    <label for="player-name-input">IDENTIFICAÇÃO DO CORREDOR</label>
-                    <input type="text" id="player-name-input" maxlength="12" placeholder="SOBREVIVENTE">
-                </div>
+        <div class="menu-container">
+            <!-- Left Column: Game settings and play action -->
+            <div class="screen-content glass-panel menu-left-panel">
+                <h1 class="logo glow-text pulse-animation">SCAPE RUNNER</h1>
+                <p class="game-story-text">Um grupo de sobreviventes foi trancado num complexo de labirintos mortais. A única saída é o Portal Dourado, mas os Drones Sentinela patrulham cada esquina com lasers letais. Não há equipas. Não há tréguas. É cada um por si. Corra para sobreviver.</p>
                 
-                <div class="color-picker-container">
-                    <label>COR DO TRAJE SENSORIAL</label>
-                    <div class="color-options">
-                        <div class="color-opt active" style="background: #00aaff;" data-color="0x00aaff"></div>
-                        <div class="color-opt" style="background: #ffaa00;" data-color="0xffaa00"></div>
-                        <div class="color-opt" style="background: #00ffaa;" data-color="0x00ffaa"></div>
-                        <div class="color-opt" style="background: #ff00aa;" data-color="0xff00aa"></div>
-                        <div class="color-opt" style="background: #aaff00;" data-color="0xaaff00"></div>
-                        <div class="color-opt" style="background: #aa00ff;" data-color="0xaa00ff"></div>
+                <div class="menu-form">
+                    <div class="input-group">
+                        <label for="player-name-input">IDENTIFICAÇÃO DO CORREDOR</label>
+                        <input type="text" id="player-name-input" maxlength="12" placeholder="SOBREVIVENTE">
+                    </div>
+                    
+                    <div class="color-picker-container">
+                        <label>COR DO TRAJE SENSORIAL</label>
+                        <div class="color-options">
+                            <div class="color-opt active" style="background: #00aaff;" data-color="0x00aaff"></div>
+                            <div class="color-opt" style="background: #ffaa00;" data-color="0xffaa00"></div>
+                            <div class="color-opt" style="background: #00ffaa;" data-color="0x00ffaa"></div>
+                            <div class="color-opt" style="background: #ff00aa;" data-color="0xff00aa"></div>
+                            <div class="color-opt" style="background: #aaff00;" data-color="0xaaff00"></div>
+                            <div class="color-opt" style="background: #aa00ff;" data-color="0xaa00ff"></div>
+                        </div>
                     </div>
                 </div>
+
+                <div class="controls-guide">
+                    <h4>GUIA TÁTICO DE CONTROLOS</h4>
+                    <ul>
+                        <li><span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span class="key">D</span> / <span class="key">Setas</span> : Movimento</li>
+                        <li><span class="key">Rato</span> : Olhar em Volta / Mirar</li>
+                        <li><span class="key">Clique Esquerdo</span> : Esticar e Soltar Atiradeira (Disparo)</li>
+                        <li><span class="key">Enter</span> : Conversar no Chat</li>
+                        <li><span class="key">ESC</span> : Pausar / Libertar Rato</li>
+                    </ul>
+                </div>
+
+                <button id="btn-play" class="btn glow-btn">INICIAR CORRIDA PELA VIDA</button>
             </div>
 
-            <div class="controls-guide">
-                <h4>GUIA TÁTICO DE CONTROLOS</h4>
-                <ul>
-                    <li><span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span class="key">D</span> / <span class="key">Setas</span> : Movimento</li>
-                    <li><span class="key">Rato</span> : Olhar em Volta / Mirar</li>
-                    <li><span class="key">Clique Esquerdo</span> : Esticar e Soltar Atiradeira (Disparo)</li>
-                    <li><span class="key">Enter</span> : Conversar no Chat</li>
-                    <li><span class="key">ESC</span> : Pausar / Libertar Rato</li>
-                </ul>
+            <!-- Right Column: Retro-arcade persistent top-10 high scores -->
+            <div class="screen-content glass-panel menu-right-panel">
+                <h2 class="glow-text leaderboard-title">TOP 10 CORREDORES</h2>
+                <div class="leaderboard-table-container">
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>POS</th>
+                                <th>NOME</th>
+                                <th>PONTOS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body">
+                            <!-- Dynamically populated from server -->
+                            <tr>
+                                <td colspan="3" style="color: #64748b; padding: 20px;">A carregar registros do Setor...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-
-            <button id="btn-play" class="btn glow-btn">INICIAR CORRIDA PELA VIDA</button>
         </div>
     </div>
 

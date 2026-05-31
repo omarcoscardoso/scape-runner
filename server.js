@@ -9,6 +9,69 @@ const PORT = process.env.PORT || 3000;
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
+// High scores persistence configuration
+const fs = require('fs');
+const HIGHSCORES_FILE = path.join(__dirname, 'highscores.json');
+let highScores = [];
+
+function loadHighScores() {
+    try {
+        if (fs.existsSync(HIGHSCORES_FILE)) {
+            const data = fs.readFileSync(HIGHSCORES_FILE, 'utf8');
+            highScores = JSON.parse(data);
+        } else {
+            // Pre-fill initial scores for sleek look
+            highScores = [
+                { name: 'APEX', score: 18500 },
+                { name: 'NEO', score: 16200 },
+                { name: 'TRINITY', score: 14800 },
+                { name: 'CYPHER', score: 13500 },
+                { name: 'GHOST', score: 12000 },
+                { name: 'ORACLE', score: 11000 },
+                { name: 'MORPHEUS', score: 10500 },
+                { name: 'TANK', score: 9500 },
+                { name: 'DOZER', score: 8500 },
+                { name: 'LINK', score: 7200 }
+            ];
+            saveHighScores();
+        }
+    } catch (e) {
+        console.error("Error loading highscores:", e);
+        highScores = [];
+    }
+}
+
+function saveHighScores() {
+    try {
+        fs.writeFileSync(HIGHSCORES_FILE, JSON.stringify(highScores, null, 2), 'utf8');
+    } catch (e) {
+        console.error("Error saving highscores:", e);
+    }
+}
+
+function addHighScore(name, score) {
+    const cleanScore = Math.floor(score);
+    if (isNaN(cleanScore) || cleanScore <= 0) return;
+    
+    // Check if score makes it to top 10
+    highScores.push({ name: name, score: cleanScore, date: new Date().toISOString() });
+    highScores.sort((a, b) => b.score - a.score);
+    highScores = highScores.slice(0, 10);
+    saveHighScores();
+    
+    broadcast({
+        type: 'highScoresUpdate',
+        highScores: highScores
+    });
+}
+
+loadHighScores();
+
+// HTTP GET API route for initial high score loading
+app.get('/api/highscores', (req, res) => {
+    res.json(highScores);
+});
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -406,6 +469,7 @@ wss.on('connection', (ws) => {
         type: 'init',
         playerId: playerId,
         seed: currentSeed,
+        highScores: highScores,
         players: Object.keys(players).map(id => ({
             id: players[id].id,
             x: players[id].x,
@@ -537,6 +601,29 @@ wss.on('connection', (ws) => {
                     health: p.health,
                     damage: data.damage
                 });
+                
+                if (p.health <= 0) {
+                    addHighScore(p.name, p.score);
+                }
+                break;
+
+            case 'pvpHit':
+                // A player hit another online player
+                const target = players[data.targetId];
+                if (target && target.active && target.health > 0) {
+                    target.health = Math.max(0, target.health - data.damage);
+                    broadcast({
+                        type: 'playerDamaged',
+                        id: target.id,
+                        health: target.health,
+                        damage: data.damage
+                    });
+
+                    if (target.health <= 0) {
+                        p.score += 1000; // Reward attacker with points
+                        addHighScore(target.name, target.score);
+                    }
+                }
                 break;
 
             case 'pickup':
@@ -569,6 +656,7 @@ wss.on('connection', (ws) => {
                 // Player reached gold escape portal
                 if (gameStatus === 'active') {
                     gameStatus = 'won';
+                    addHighScore(p.name, p.score);
                     broadcast({
                         type: 'gameOver',
                         winnerId: playerId,

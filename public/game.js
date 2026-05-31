@@ -111,6 +111,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
     initHUDCanvases();
     
+    // Fetch initial persistent high scores on page load
+    fetch('/api/highscores')
+        .then(res => res.json())
+        .then(data => populateLeaderboard(data))
+        .catch(err => console.error("Error loading highscores on startup:", err));
+
     // Start game loading
     setTimeout(() => {
         loadingScreen.classList.remove('active');
@@ -229,6 +235,9 @@ function connectWebSocket() {
         switch (msg.type) {
             case 'init':
                 localPlayerId = msg.playerId;
+                if (msg.highScores) {
+                    populateLeaderboard(msg.highScores);
+                }
                 // Generate identical maze using server's seed
                 buildLabyrinth(msg.seed);
                 
@@ -263,7 +272,21 @@ function connectWebSocket() {
                     op.targetPos.set(msg.x, msg.y, msg.z);
                     op.targetYaw = msg.yaw;
                     op.targetPitch = msg.pitch;
-                    op.health = msg.health;
+                    
+                    // Recreate dynamic name tag only when health actually changes (performance optimized)
+                    if (op.health !== msg.health) {
+                        op.health = msg.health;
+                        if (op.nameTag) {
+                            op.mesh.remove(op.nameTag);
+                            if (op.nameTag.material) op.nameTag.material.dispose();
+                            if (op.nameTag.material.map) op.nameTag.material.map.dispose();
+                        }
+                        const hexCol = '#' + op.color.toString(16).padStart(6, '0');
+                        op.nameTag = createNameTag(op.name, hexCol, op.health);
+                        op.nameTag.position.set(0, 2.4, 0);
+                        op.mesh.add(op.nameTag);
+                    }
+                    
                     op.armor = msg.armor;
                     op.score = msg.score;
                 }
@@ -324,12 +347,32 @@ function connectWebSocket() {
                     playerHealth = msg.health;
                     playPlayerHit();
                     triggerPortraitFace('damaged');
+                    
+                    // Flash screen voxel damage particles on local player hit
+                    explodeVoxelMesh(camera.position, 0xff0055, 15);
+                    
                     if (playerHealth <= 0) {
                         triggerDeath();
                     }
                 } else {
                     const op = otherPlayers[msg.id];
-                    if (op) op.health = msg.health;
+                    if (op) {
+                        op.health = msg.health;
+                        
+                        // Update player name tag and health indicator
+                        if (op.nameTag) {
+                            op.mesh.remove(op.nameTag);
+                            if (op.nameTag.material) op.nameTag.material.dispose();
+                            if (op.nameTag.material.map) op.nameTag.material.map.dispose();
+                        }
+                        const hexCol = '#' + op.color.toString(16).padStart(6, '0');
+                        op.nameTag = createNameTag(op.name, hexCol, op.health);
+                        op.nameTag.position.set(0, 2.4, 0);
+                        op.mesh.add(op.nameTag);
+
+                        // Broadcast red impact voxel particles on the remote hit player for all to see
+                        explodeVoxelMesh(op.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 0xff0055, 15);
+                    }
                 }
                 break;
 
@@ -390,8 +433,10 @@ function connectWebSocket() {
                 break;
 
             case 'restartGame':
-                // Reset HUD & Position
+                // Reset HUD, close all screens & Position
                 winScreen.classList.remove('active');
+                gameOverScreen.classList.remove('active');
+                pauseScreen.classList.remove('active');
                 playerHealth = 100;
                 playerArmor = 100;
                 playerScore = 10000;
@@ -420,11 +465,28 @@ function connectWebSocket() {
 
             case 'playerRenamed':
                 const opName = otherPlayers[msg.id];
-                if (opName) opName.name = msg.name;
+                if (opName) {
+                    opName.name = msg.name;
+                    
+                    // Recreate name tag with new name
+                    if (opName.nameTag) {
+                        opName.mesh.remove(opName.nameTag);
+                        if (opName.nameTag.material) opName.nameTag.material.dispose();
+                        if (opName.nameTag.material.map) opName.nameTag.material.map.dispose();
+                    }
+                    const hexCol = '#' + opName.color.toString(16).padStart(6, '0');
+                    opName.nameTag = createNameTag(opName.name, hexCol, opName.health);
+                    opName.nameTag.position.set(0, 2.4, 0);
+                    opName.mesh.add(opName.nameTag);
+                }
                 break;
 
             case 'chat':
                 addChatMessage(msg.senderName, msg.senderColor, msg.text);
+                break;
+
+            case 'highScoresUpdate':
+                populateLeaderboard(msg.highScores);
                 break;
         }
     };
@@ -585,6 +647,13 @@ function spawnOtherPlayer(p) {
 
     // Position other player directly on the ground floor at y = 0.0
     group.position.set(p.x, 0.0, p.z);
+    
+    // Create visual name tag and dynamic health indicator above player helmet
+    const hexCol = '#' + p.color.toString(16).padStart(6, '0');
+    const nameTag = createNameTag(p.name, hexCol, p.health || 100);
+    nameTag.position.set(0, 2.4, 0);
+    group.add(nameTag);
+    
     scene.add(group);
 
     otherPlayers[p.id] = {
@@ -592,6 +661,7 @@ function spawnOtherPlayer(p) {
         name: p.name,
         color: p.color,
         mesh: group,
+        nameTag: nameTag,
         armL: armL,
         armR: armR,
         legL: legL,
@@ -599,9 +669,9 @@ function spawnOtherPlayer(p) {
         targetPos: new THREE.Vector3(p.x, 0.0, p.z),
         targetYaw: p.yaw || 0,
         targetPitch: p.pitch || 0, // Safe default to prevent NaNs
-        health: 100,
-        armor: 100,
-        score: 10000
+        health: p.health || 100,
+        armor: p.armor || 100,
+        score: p.score || 10000
     };
 }
 
@@ -609,6 +679,16 @@ function removeOtherPlayer(id) {
     const op = otherPlayers[id];
     if (op) {
         scene.remove(op.mesh);
+        
+        // Clean up Three.js name tag materials/textures to avoid memory leaks
+        if (op.nameTag) {
+            op.mesh.remove(op.nameTag);
+            if (op.nameTag.material) {
+                if (op.nameTag.material.map) op.nameTag.material.map.dispose();
+                op.nameTag.material.dispose();
+            }
+        }
+        
         addChatMessage('SISTEMA', '#ff3366', `${op.name} desconectou-se da táctica.`);
         delete otherPlayers[id];
     }
@@ -1133,10 +1213,11 @@ function updateProjectiles(delta) {
             continue;
         }
 
-        // B. Collision check: Local Player Stones hitting Drones
+        // B. Collision check: Local Player Stones hitting Drones or Other Players
         if (stone.local && !stone.isDroneEnergy) {
             let hitRegistered = false;
             
+            // Check collisions against Drones
             Object.keys(drones).forEach(dId => {
                 if (hitRegistered) return;
                 const drone = drones[dId];
@@ -1157,6 +1238,36 @@ function updateProjectiles(delta) {
                     hitRegistered = true;
                 }
             });
+
+            // Check PVP collisions against other players (cylindrical collision check)
+            if (!hitRegistered) {
+                Object.keys(otherPlayers).forEach(opId => {
+                    if (hitRegistered) return;
+                    const op = otherPlayers[opId];
+                    if (op.health <= 0) return;
+
+                    const opPos = op.mesh.position; // Grounded y=0 base position
+                    const dx = pos.x - opPos.x;
+                    const dz = pos.z - opPos.z;
+                    const distXZ = Math.sqrt(dx * dx + dz * dz);
+
+                    // Cylindrical check: radius 0.6, height range 0.0 to 2.2
+                    if (distXZ < 0.6 && pos.y >= 0.0 && pos.y <= 2.2) {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({
+                                type: 'pvpHit',
+                                targetId: opId,
+                                damage: 25 // standard slingshot stone damage against players
+                            }));
+                        }
+                        
+                        // Local instant hit feedback
+                        playEnemyHit();
+                        explodeVoxelMesh(pos, 0xff0055, 12); // red impact particles
+                        hitRegistered = true;
+                    }
+                });
+            }
 
             if (hitRegistered) {
                 scene.remove(stone.mesh);
@@ -1644,6 +1755,88 @@ function addChatMessage(sender, colorHex, text) {
     
     chatMessages.appendChild(p);
     chatMessages.scrollTop = chatMessages.scrollHeight; // auto scroll down
+}
+
+// Escapes special characters to prevent HTML/XSS injection
+function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+// Populates the home screen Top 10 High Scores table
+function populateLeaderboard(highScoresList) {
+    const tbody = document.getElementById('leaderboard-body');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (!highScoresList || highScoresList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="color: #64748b; padding: 20px;">SEM REGISTOS</td></tr>';
+        return;
+    }
+    
+    highScoresList.forEach((entry, index) => {
+        const tr = document.createElement('tr');
+        const pos = index + 1;
+        
+        // Pódio styles
+        if (pos === 1) tr.classList.add('top-1');
+        else if (pos === 2) tr.classList.add('top-2');
+        else if (pos === 3) tr.classList.add('top-3');
+        
+        tr.innerHTML = `
+            <td>#${pos}</td>
+            <td style="text-align: left; padding-left: 15px;">${escapeHtml(entry.name)}</td>
+            <td>${Math.floor(entry.score)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Generates dynamic 2D canvas based player nametags and health indicators floting in 3D
+function createNameTag(name, colorHex, health = 100) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 80;
+    const ctx = canvas.getContext('2d');
+    
+    // Glassmorphic panel background
+    ctx.fillStyle = 'rgba(10, 14, 23, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(0, 0, 256, 80, 10) : ctx.rect(0, 0, 256, 80);
+    ctx.fill();
+    
+    // Border colored after player sensory suit
+    ctx.strokeStyle = colorHex;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Player Name in bold retro-cyberpunk typography
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px "Orbitron", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(name, 128, 30);
+    
+    // Dynamic health bar
+    const barWidth = 180;
+    const barHeight = 8;
+    const barX = 128 - barWidth / 2;
+    const barY = 52;
+    
+    // Empty background
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+    
+    // Active fill with custom HP colors
+    const hpPercent = Math.max(0, Math.min(100, health)) / 100;
+    ctx.fillStyle = hpPercent > 0.5 ? '#10b981' : (hpPercent > 0.25 ? '#f59e0b' : '#ef4444');
+    ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(material);
+    
+    sprite.scale.set(2.0, 0.625, 1.0);
+    return sprite;
 }
 
 function drawOnlineSquadHUD() {

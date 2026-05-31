@@ -826,7 +826,119 @@ body.in-game #game-hud {
     image-rendering: pixelated;
 }
 
+/* Menu Screen Scoreboard Leaderboard styling */
+.menu-container {
+    display: flex;
+    gap: 30px;
+    max-width: 1100px;
+    width: 95%;
+    justify-content: center;
+    align-items: stretch;
+    z-index: 5;
+}
+
+.menu-left-panel {
+    flex: 1.2;
+    max-width: 550px;
+}
+
+.menu-right-panel {
+    flex: 0.8;
+    max-width: 450px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.leaderboard-title {
+    font-family: var(--font-retro);
+    font-size: 1.0rem;
+    color: var(--neon-yellow);
+    margin-bottom: 25px;
+    text-shadow: 0 0 10px var(--neon-yellow);
+    letter-spacing: 1px;
+}
+
+.leaderboard-table-container {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 10px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 480px;
+}
+
+/* Custom scrollbar for leaderboard */
+.leaderboard-table-container::-webkit-scrollbar {
+    width: 6px;
+}
+.leaderboard-table-container::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.3);
+}
+.leaderboard-table-container::-webkit-scrollbar-thumb {
+    background: var(--neon-yellow);
+    border-radius: 2px;
+}
+
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-retro);
+    font-size: 0.625rem;
+}
+
+.leaderboard-table th {
+    padding: 10px 5px;
+    color: var(--neon-blue);
+    border-bottom: 2px solid rgba(0, 229, 255, 0.2);
+    text-align: center;
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+}
+
+.leaderboard-table td {
+    padding: 12px 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: center;
+}
+
+.leaderboard-table tr:last-child td {
+    border-bottom: none;
+}
+
+.leaderboard-table tr.top-1 {
+    color: var(--neon-yellow);
+    text-shadow: 0 0 5px var(--neon-yellow);
+}
+.leaderboard-table tr.top-2 {
+    color: var(--neon-cyan);
+    text-shadow: 0 0 5px var(--neon-cyan);
+}
+.leaderboard-table tr.top-3 {
+    color: var(--neon-green);
+    text-shadow: 0 0 5px var(--neon-green);
+}
+
 /* Mobile Friendly overrides */
+@media (max-width: 900px) {
+    .menu-container {
+        flex-direction: column;
+        align-items: center;
+        overflow-y: auto;
+        max-height: 95vh;
+        gap: 20px;
+    }
+    .menu-left-panel, .menu-right-panel {
+        max-width: 500px;
+        width: 100%;
+    }
+    .leaderboard-table-container {
+        max-height: 220px;
+    }
+}
+
 @media (max-width: 768px) {
     .logo { font-size: 1.6rem; }
     .screen-content { padding: 20px; }
