@@ -4,7 +4,6 @@ npm-debug.log
 .github
 Dockerfile
 .dockerignore
-package-lock.json
 *.md
 .env*
 *task-*.log
